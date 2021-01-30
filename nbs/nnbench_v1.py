@@ -37,6 +37,11 @@ class NNBench:
     def rollback_net(self):
         self.net = dill.loads(self.net_checkpoint)
         
+    def randomize_net(self):
+        for layer in self.net.layers:
+            if hasattr(layer, 'randomize'):
+                layer.randomize()
+
     def training_data_gen_randn(self, n):
         """Generate n instances of labelled training data"""
         np.random.seed(self.seed)
