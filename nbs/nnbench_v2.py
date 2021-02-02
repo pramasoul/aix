@@ -36,7 +36,21 @@ class NNBench:
         
     def rollback_net(self):
         self.net = dill.loads(self.net_checkpoint)
+
+    def save_net_to_file(self, f):
+        dill.dump(self.net, f)
+
+    def load_net_from_file(self, f):
+        self.net = dill.load(f)
+
+    def save_net_to_filename(self, name):
+        with open(name, 'wb') as f:
+            dill.dump(self.net, f)
         
+    def load_net_from_filename(self, name):
+        with open(name, 'rb') as f:
+            self.net = dill.load(f)
+
     def randomize_net(self):
         for layer in self.net.layers:
             if hasattr(layer, 'randomize'):
@@ -58,6 +72,9 @@ class NNBench:
     def learn(self, n=100):
         return [self.net.learn([fact]) for fact in self.training_data_gen(n)]
             
+    def learn_track(self, n=100):
+        return [(self.net.learn([fact]), self.net.state_vector()) for fact in self.training_data_gen(n)]
+
     def learning_potential(self, n=100, eta=None):
         stash = dill.dumps(self.net)
         if eta is not None: # only change the net's eta if a value was passed to us
@@ -115,7 +132,6 @@ class NNBench:
         fig.show()
 
     def plot_learning(self, n):
-        from matplotlib import pyplot as plt
         # self.losses = losses = [self.net.learn(fact for fact in self.training_data_gen(n))]
         losses = self.learn(n)
         plt.yscale('log')
@@ -157,10 +173,13 @@ class NNBench:
         nl = len(nlayers)
         wpy = 0.8
         wph = .6
-        weights_axes = [plt.axes([.025,wpy-wph*(i+1)/nl, 0.15,(wph-.1)/nl]) for i in range(nl)]
+        weights_axes = [plt.axes([.025,wpy-wph*(i+1)/nl, 0.10,(wph-.1)/nl]) for i in range(nl)]
         def make_iax_images():
-            return [weights_axes[i].imshow(np.concatenate((self.net.layers[nlayers[i]].M,self.net.layers[nlayers[i]].b),axis=1))
-                                                    for i in range(len(nlayers))]
+            return [weights_axes[i].imshow(np.concatenate(
+                (self.net.layers[nlayers[i]].M,
+                 np.atleast_2d(self.net.layers[nlayers[i]].b)),
+                axis=0))
+                    for i in range(len(nlayers))]
         def update_iax(imgs=[make_iax_images()]):
             for img in imgs[0]:
                 img.remove()
