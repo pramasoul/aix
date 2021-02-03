@@ -22,7 +22,7 @@ class TestNN(unittest.TestCase):
         
     def testAffineLayerBackprop(self):
         a = nn.AffineLayer(2,3)
-        return
+        return #FIXME
         dx = np.random.randn(2) * 0.001
         dy = (a(x + dx) - a(x - dx)) / 2.0
         y = a(x)
