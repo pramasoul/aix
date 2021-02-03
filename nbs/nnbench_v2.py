@@ -73,7 +73,7 @@ class NNBench:
         return [self.net.learn([fact]) for fact in self.training_data_gen(n)]
             
     def learn_track(self, n=100):
-        return [(self.net.learn([fact]), self.net.state_vector()) for fact in self.training_data_gen(n)]
+        return [(self.net.state_vector(), self.net.learn([fact])) for fact in self.training_data_gen(n)]
 
     def learning_potential(self, n=100, eta=None):
         stash = dill.dumps(self.net)
@@ -134,11 +134,120 @@ class NNBench:
     def plot_learning(self, n):
         # self.losses = losses = [self.net.learn(fact for fact in self.training_data_gen(n))]
         losses = self.learn(n)
+        fig, ax = plt.subplots()  # Create a figure and an axes.
+        ax.plot(losses, label=f"$\eta={self.net.eta}$")  # Plot some data on the axes.
+        ax.set_xlabel('learnings')  # Add an x-label to the axes.
+        ax.set_ylabel('loss')  # Add a y-label to the axes.
+        ax.set_title("Losses")  # Add a title to the axes.
+        ax.set_yscale('log')
+        ax.legend()  # Add a legend.
+        """
         plt.yscale('log')
         plt.plot(range(len(losses)),losses)
         plt.show(block=0)
+        """
         
     def knobs_plot_learning(self, n):
+        pickled_net = dill.dumps(self.net)
+        # from matplotlib import pyplot as plt
+        fig, ax = plt.subplots()
+        plt.subplots_adjust(left=0.25, bottom=0.25)
+        a0 = 5
+        f0 = 3
+        
+        ###
+        losses = [self.net.learn([fact]) for fact in self.training_data_gen(n)]
+        #l, = plt.plot(range(len(losses)), losses, lw=2)
+        l, = ax.plot(losses, label=f"$\eta={self.net.eta}$")  # Plot some data on the axes.
+        #ax.margins(x=0)
+        #plt.yscale('log')
+        ax.set_xlabel('learnings')  # Add an x-label to the axes.
+        ax.set_ylabel('loss')  # Add a y-label to the axes.
+        ax.set_title("Losses")  # Add a title to the axes.
+        ax.set_yscale('log')
+        ax.legend()  # Add a legend.
+
+        axcolor = 'lightgoldenrodyellow'
+        axeta = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
+        axnum = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
+        
+        def sfunc(x):
+            return 2**(-1.005/(x+.005))
+        def sinv(x):
+            return (-1.005/math.log2(x))-.005
+        
+        seta = Slider(axeta, '$\eta$', 0, 1, valinit=sinv(self.net.eta))
+        snum = Slider(axnum, 'Num', 1, 10*n, valinit=n, valstep=1)
+        
+        filtfunc = [lambda x:x]
+        
+        
+        big = max(losses)
+        ax.set_title(f"$\eta$={self.net.eta:1.3e}")
+        nlayers = [i for i in range(len(self.net.layers)) if hasattr(self.net.layers[i], 'M')]
+        nl = len(nlayers)
+        wpy = 0.8
+        wph = .6
+        weights_axes = [plt.axes([.025,wpy-wph*(i+1)/nl, 0.10,(wph-.1)/nl]) for i in range(nl)]
+        def make_iax_images():
+            return [weights_axes[i].imshow(np.concatenate(
+                (self.net.layers[nlayers[i]].M,
+                 np.atleast_2d(self.net.layers[nlayers[i]].b)),
+                axis=0))
+                    for i in range(len(nlayers))]
+        def update_iax(imgs=[make_iax_images()]):
+            for img in imgs[0]:
+                img.remove()
+            imgs[0] = make_iax_images()
+
+        def update(val,ax=ax,loc=[l]):
+            n = int(snum.val)
+            self.net = dill.loads(pickled_net)
+            
+            self.net.eta = sfunc(seta.val)
+            #seta.set_label("2.4e"%(self.net.eta,))
+            losses = filtfunc[0]([self.net.learn([fact]) for fact in self.training_data_gen(n)])
+            big = max(losses)
+            ax.set_title(f"$\eta$={self.net.eta:1.3e}")
+            loc[0].remove()
+            loc[0], = ax.plot(range(len(losses)), losses, lw=2,color='xkcd:blue', label=f"$\eta={self.net.eta:.2g}$")
+            ax.set_xlim((0,len(losses)))
+            ax.set_ylim((min(losses),big))
+            update_iax()
+            ax.legend()
+            fig.canvas.draw_idle()
+
+        seta.on_changed(update)
+        snum.on_changed(update)
+
+        resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
+        button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
+
+    
+        def reset(event):
+            self.seed += 1
+            update()
+        button.on_clicked(reset)
+
+        rax = plt.axes([0.025, 0.025, 0.15, 0.15], facecolor=axcolor)
+        radio = RadioButtons(rax, ('raw', 'low pass', 'green'), active=0)
+
+        
+        def colorfunc(label):
+            if label == "raw":
+                filtfunc[0] = lambda x:x
+            elif label == "low pass":
+                filtfunc[0] = lambda x:ndimage.gaussian_filter(np.array(x),3)
+            #l.set_color(label)
+            #fig.canvas.draw_idle()
+            update()
+        radio.on_clicked(colorfunc)
+
+        plt.show()
+        #return 'gc protect:', update, reset, colorfunc,seta,snum, radio, button
+        self.gc_protect.append((update, reset, colorfunc,seta,snum, radio, button))
+
+    def was_knobs_plot_learning(self, n):
         pickled_net = dill.dumps(self.net)
         # from matplotlib import pyplot as plt
         fig, ax = plt.subplots()
