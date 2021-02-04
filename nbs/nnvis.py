@@ -48,7 +48,8 @@ class NNVis:
     def knobs_plot_learning(self, n):
         bench = self.bench
         net = bench.net
-        pickled_net = dill.dumps(net)
+        #pickled_net = dill.dumps(net)
+        initial_state_vector = net.state_vector()
         # from matplotlib import pyplot as plt
         fig, ax = plt.subplots()
         plt.subplots_adjust(left=0.25, bottom=0.25)
@@ -102,7 +103,8 @@ class NNVis:
 
         def update(val,ax=ax,loc=[l]):
             n = int(snum.val)
-            net = dill.loads(pickled_net)
+            #net = dill.loads(pickled_net)
+            net.set_state_from_vector(initial_state_vector)
             
             net.eta = sfunc(seta.val)
             #seta.set_label("2.4e"%(self.net.eta,))
@@ -145,6 +147,31 @@ class NNVis:
 
         plt.show()
         self.gc_protect.append((update, reset, colorfunc,seta,snum, radio, button))
+
+
+    def plot_trajectory(self, traja):
+        # Development space for plotting:
+        fig, ax = plt.subplots()  # Create a figure and an axes.
+        traj_color = 'xkcd:red'
+        loss_color = 'xkcd:blue'
+        cos_color = 'xkcd:green'
+        ax.set_xlabel('$n$')  # Add an x-label to the axes.
+        ax.set_ylabel('$|\Delta state|$', color=traj_color)
+        ax.tick_params(axis='y', labelcolor=traj_color)
+        ax.set_title(f"$\eta={self.bench.net.eta}$")  # Add a title to the axes.
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        tnl, = ax.plot(traja.traj_L2, label=f"traj norm", color=traj_color)  # Plot some data on the axes.
+        ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis
+        ax2.tick_params(axis='y', labelcolor=loss_color)
+        dll, = ax2.plot(traja.loss_steps, label=f"$\Delta loss$", color=loss_color)  # Plot some data on the axes.
+        #dll, = ax2.plot(np.tanh(10*traja.loss_steps), label=f"$\tanh(\Delta loss)$", color=loss_color)  # Plot some data on the axes.
+        cosl, = ax2.plot(traja.traj_cos, label=f"$\Delta state cosine$", color=cos_color)
+        ax.legend([tnl, dll, cosl], ["$\\|\\Delta state \\|$", "$\\Delta loss$", "$cos(\\theta)\Delta$"])  # Add a legend.
+        #ax.legend([tnl, dll, cosl], ["$\\|\\Delta state \\|$", "$\\tanh(\\Delta loss)$", "$cos(\\theta)\Delta$"])  # Add a legend.
+        #ax2.legend()  # Add a legend.
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
+        plt.show()
 
 #-----------------------------------------------------------------------------------------------
 if False: #boneyard
