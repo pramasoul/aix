@@ -61,6 +61,7 @@ class NNBench:
             if hasattr(layer, 'M'):
                 self.input_width = layer.M.shape[1]
                 break
+
         self.training_data_gen = self.training_data_gen_randn
 
         # training_batch(n) returns a single batch of n truths
@@ -106,12 +107,13 @@ class NNBench:
         return [(self.net.state_vector(), self.net.learn([self.training_batch(batch_size)])) for i in range(batches)]
 
     def training_data_gen_randn(self, n):
-        """Generate n instances of labelled training data"""
+        """Yields n instances of labelled training data (aka "truths"). """
         np.random.seed(self.seed) #FIXME: chain forward
         width = self.input_width
         for i in range(n):
             v = np.random.randn(width)
             yield (v, self.ideal(v)) #FIXME: means to alter input
+            #FIX by using a method to obtain examples from domain
 
     def wRONG_training_data_gen_fixed(self, n):
         len_td = len(self.training_data)
