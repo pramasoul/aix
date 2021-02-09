@@ -34,6 +34,7 @@ class NNBench:
                 self.input_width = layer.M.shape[1]
                 break
         self.training_data_gen = self.training_data_gen_randn
+        self.training_batch = self.training_batch_from_gen
     
     def checkpoint_net(self):
         #self.net_checkpoint = dill.dumps(self.net)
@@ -73,12 +74,19 @@ class NNBench:
         len_td = len(self.training_data)
         for i in range(n):
             yield self.training_data[i % len_td]
-        
-    def learn(self, n=100):
+
+    def was_learn(self, n=100):
         return [self.net.learn([fact]) for fact in self.training_data_gen(n)]
+
+    def learn(self, batches=100, batch_size=1):
+        return [self.net.learn(self.training_batch(batch_size)) for i in range(batches)]
             
-    def learn_track(self, n=100):
-        return [(self.net.state_vector(), self.net.learn([fact])) for fact in self.training_data_gen(n)]
+    def training_batch_from_gen(self, batch_size):
+        x, y = zip(*self.training_data_gen(batch_size))
+        return np.array(x), np.array(y)
+
+    def learn_track(self, batches=100, batch_size=1):
+        return [(self.net.state_vector(), self.net.learn(self.training_batch(batch_size))) for i in range(batches)]
 
     def learning_potential(self, n=100, eta=None):
         starting_sv = self.net.state_vector()
