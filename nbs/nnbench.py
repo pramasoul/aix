@@ -44,17 +44,19 @@ class Thing:
         self.__dict__.update(kwargs)
 
 class NNBench:
-    def __init__(self, net, ideal=lambda x:x):
-        self.net = net
-        self.ideal = ideal
-        self.seed = 3
-
+    def net_input_width(net):
         # Hack to figure out the input width of the net
-        self.input_width = None
+        input_width = None
         for layer in net.layers:
             if hasattr(layer, 'M'):
-                self.input_width = layer.M.shape[1]
+                input_width = layer.M.shape[1]
                 break
+        return input_width
+
+    def __init__(self, net, ideal=lambda x:x):
+        self(net)
+        self.ideal = ideal
+        self.seed = 3
 
         ###self.training_data_gen = self.training_data_gen_randn
 
@@ -63,30 +65,42 @@ class NNBench:
         # It defaults to producing the batch by generating from truths
         self.training_batch = self.training_batch_from_gen
 
+    def __call__(self, net):
+        self.net = net
+        self.input_width = self.__class__.net_input_width(self.net)
+        return self
+
     def checkpoint_net(self):
         self.net_checkpoint = self.net.state_vector()
+        return self
 
     def rollback_net(self):
         self.net.set_state_from_vector(self.net_checkpoint)
+        return self
 
     def save_net_to_file(self, f):
         dill.dump(self.net, f)
+        return self
 
     def load_net_from_file(self, f):
         self.net = dill.load(f)
+        return self
 
     def save_net_to_filename(self, name):
         with open(name, 'wb') as f:
             dill.dump(self.net, f)
+        return self
 
     def load_net_from_filename(self, name):
         with open(name, 'rb') as f:
             self.net = dill.load(f)
+        return self
 
     def randomize_net(self):
         for layer in self.net.layers:
             if hasattr(layer, 'randomize'):
                 layer.randomize()
+        return self
 
     def learn(self, batches=100, batch_size=1):
         # Trains the net by feeding it with batch clusters containing a single batch each,
@@ -101,6 +115,7 @@ class NNBench:
 
     def accept_source_of_truth(self, iterable):
         self.plato = itertools.cycle(iterable)
+        return self
 
     def training_data_gen(self, batch_size=1):
         for i in range(batch_size):
@@ -113,7 +128,7 @@ class NNBench:
     def training_data_gen_randn(self, n):
         """Yields n instances of labelled training data (aka "truths"). """
         np.random.seed(self.seed) #FIXME: chain forward
-        width = self.input_width
+        width = self.__class__.net_input_width(self.net)
         for i in range(n):
             v = np.random.randn(width)
             yield (v, self.ideal(v)) #FIXME: means to alter input

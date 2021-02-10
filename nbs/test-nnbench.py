@@ -23,8 +23,8 @@ class TestNNBench(unittest.TestCase):
 
     def setUp(self):
         self.create_patch('nn.Network')
-        
-        
+
+
     def test_bench_checkpoint(self):
         net = nn.Network()
         bench = NNBench(net)
@@ -39,34 +39,34 @@ class TestNNBench(unittest.TestCase):
         bench.rollback_net()
         net.set_state_from_vector.assert_called_once_with(sv)
 
-        
+
     def test_bench_network_input_width_detection(self):
-        # Mock up a network with a determined input width 
+        # Mock up a network with a determined input width
         net = nn.Network()
         mock_layer = MagicMock()
         mock_layer.M = np.zeros(2*3).reshape(3,2)
         net.layers = [mock_layer]
 
-        # A bench of a net discovers the input width of the net 
+        # A bench of a net discovers the input width of the net
         bench = NNBench(net)
         self.assertEqual(bench.net.layers[0].M.shape, (3,2)) # verify we mocked it as intended
-        self.assertEqual(bench.input_width, 2)
+        self.assertEqual(NNBench.net_input_width(bench.net), 2)
 
-            
-    def test_network_learn_input_form(self):        
+
+    def test_network_learn_input_form(self):
         # Make a constant training batch for a two-in, three-out net,
         # containing two examples
         training_batch = (np.arange(2*3).reshape(-1,2), arangep(3*3).reshape(-1,3))
 
         # The training batch matches the form expected by Network.learn
         facts = [training_batch, training_batch] # Facts can have multiple batches
-        
+
         # Duplicating the looper from Network.learn
         for x, expected in facts:
             self.assertEqual(x.shape[0], expected.shape[0]) # Each input has an output
             self.assertEqual(x.shape[1], 2) # Inputs have width 2
             self.assertEqual(expected.shape[1], 3) # Outputs have width 3
-        
+
     def test_bench_learn_training_batch(self):
         # Mock up a network of input width 2
         net = nn.Network()
@@ -85,7 +85,7 @@ class TestNNBench(unittest.TestCase):
             self.assertEqual(x.shape[0], expected.shape[0]) # Each input has an output
             self.assertEqual(x.shape[1], 2) # Inputs have width 2
             self.assertEqual(expected.shape[1], 3) # Outputs have width 3
-        
+
         bench.training_batch = lambda n: training_batch
         #print(bench.training_batch)
         bench.learn(batches=2)
@@ -106,7 +106,7 @@ class TestNNBench(unittest.TestCase):
 
     def test_training_data_batching_from_literal(self):
         net = nn.Network()
-        
+
         # Setup for input width of 2
         mock_layer = MagicMock()
         mock_layer.M = np.zeros(2*3).reshape(3,2)
@@ -117,18 +117,18 @@ class TestNNBench(unittest.TestCase):
         training_data = [([1,2],[5]), ([4,3], [10])] # Two truths
         bench.accept_source_of_truth(training_data)
         bench.training_batch = bench.training_batch_from_gen
-        
+
         # It feeds the net batches of the requested size, produced from Facts, by repetition
         bench.learn(batches=2, batch_size=3)
         #print(net.mock_calls)
         expected = [call([(array([[1, 2], [4, 3], [1, 2]]), array([[ 5], [10], [ 5]]))]),
                     call([(array([[4, 3], [1, 2], [4, 3]]), array([[10], [ 5], [10]]))])]
         self.assertEqual(pformat(expected), pformat(net.learn.mock_calls))
-        
+
 
     def test_training_data_batching_from_gen(self):
         net = nn.Network()
-        
+
         # Setup for input width of 2
         mock_layer = MagicMock()
         mock_layer.M = np.zeros(2*3).reshape(3,2)
@@ -137,7 +137,7 @@ class TestNNBench(unittest.TestCase):
 
         # A bench can accept generated facts
         bench.accept_source_of_truth(((v, np.array([v.dot(np.array([2, 3]))])) for v in (arangep(2,2*i) for i in range(5))))
-                
+
         # It feeds the net batches of the requested size, produced from Facts, by repetition
         net.reset_mock()
         bench.learn(batches=2, batch_size=3)
@@ -145,19 +145,19 @@ class TestNNBench(unittest.TestCase):
         expected = [call([(array([[2, 3], [5, 7], [11, 13]]), array([[ 13], [31], [61]]))]),
                     call([(array([[17, 19], [23, 29], [2, 3]]), array([[91], [133], [13]]))])]
         self.assertEqual(pformat(expected), pformat(net.learn.mock_calls))
-        
+
 
     @unittest.skip("Test is WIP")
     def test_bench_learn_training_data_gen_fixed(self):
         net = nn.Network()
-        
+
         # Setup for input width of 2
         mock_layer = MagicMock()
         mock_layer.M = np.zeros(2*3).reshape(3,2)
         net.layers = [mock_layer]
         bench = NNBench(net)
-        
-        
+
+
         #bench.ideal = lambda v: v @ np.array([0,1,1,0]).reshape(2,2) #UNUSED in this test
         bench.training_data = [([1,2],[5]),
                                ([4,3], [10])]
@@ -183,7 +183,7 @@ class TestNNBench(unittest.TestCase):
                     call([(array([[4, 3], [1, 2], [4, 3]]), array([[10], [ 5], [10]]))])]
         self.assertEqual(pformat(expected), pformat(net.learn.mock_calls))
 
-        
+
     @unittest.skip("Test is defective")
     def test_bench_learn_gen_randn(self):
         net = nn.Network()
@@ -201,16 +201,16 @@ class TestNNBench(unittest.TestCase):
         def training_data_gen_randn(n):
             """Generate n instances of labelled training data"""
             width = bench.input_width
-            v = np.random.random_sample((n,1)) * 1.2 - 0.1        
+            v = np.random.random_sample((n,1)) * 1.2 - 0.1
             yield v, vadc(v)
 
         bench.training_data_gen = training_data_gen_randn
         loss = bench.learn(batches=2)
         expected = 'fur'
         self.assertEqual(pformat(expected), pformat(net.learn.mock_calls))
-        
-        
-        
+
+
+
 class MyTest(unittest.TestCase):
     def setUp(self):
         patcher = patch('nn.Network')
@@ -222,7 +222,7 @@ class MyTest(unittest.TestCase):
 
     def test_other(self):
         assert nn.Network is self.MockClass
-        
+
 class DemoTest(unittest.TestCase):
     def create_patch(self, name):
         patcher = patch(name)
@@ -238,7 +238,7 @@ class DemoTest(unittest.TestCase):
         assert nn.Network is mock_Network
         assert nn.AffineLayer is mock_AffineLayer
         assert nn.MapLayer is mock_MapLayer
-        
-        
+
+
 if __name__ == '__main__':
     unittest.main()
