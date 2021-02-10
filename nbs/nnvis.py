@@ -24,10 +24,9 @@ class NNVis:
         self.gc_protect = []
         self.seed = 3
     
-    def plot_learning(self, n):
+    def plot_learning(self, batches=100, batch_size=1):
         bench = self.bench
-        # self.losses = losses = [self.net.learn(fact for fact in self.training_data_gen(n))]
-        losses = bench.learn(n)
+        losses = bench.learn(batches=batches, batch_size=batch_size)
         fig, ax = plt.subplots()  # Create a figure and an axes.
         ax.plot(losses, label=f"$\eta={bench.net.eta}$")  # Plot some data on the axes.
         ax.set_xlabel('learnings')  # Add an x-label to the axes.
@@ -45,10 +44,10 @@ class NNVis:
         fig.update_layout(width=800, height=800)
         fig.show()
         
-    def knobs_plot_learning(self, n):
+    def knobs_plot_learning(self, batches=100, batch_size=1):
+        n = batches
         bench = self.bench
         net = bench.net
-        #pickled_net = dill.dumps(net)
         initial_state_vector = net.state_vector()
         # from matplotlib import pyplot as plt
         fig, ax = plt.subplots()
@@ -57,16 +56,13 @@ class NNVis:
         f0 = 3
         
         ###
-        losses = [net.learn([fact]) for fact in bench.training_data_gen(n)]
-        #l, = plt.plot(range(len(losses)), losses, lw=2)
-        l, = ax.plot(losses, label=f"$\eta={net.eta}$")  # Plot some data on the axes.
-        #ax.margins(x=0)
-        #plt.yscale('log')
-        ax.set_xlabel('learnings')  # Add an x-label to the axes.
-        ax.set_ylabel('loss')  # Add a y-label to the axes.
-        ax.set_title("Losses")  # Add a title to the axes.
+        losses = bench.learn(batches=batches, batch_size=batch_size)
+        l, = ax.plot(losses, label=f"$\eta={net.eta}$")
+        ax.set_xlabel('learnings')
+        ax.set_ylabel('loss')
+        ax.set_title("Losses")
         ax.set_yscale('log')
-        ax.legend()  # Add a legend.
+        ax.legend()
 
         axcolor = 'lightgoldenrodyellow'
         axeta = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
@@ -81,7 +77,6 @@ class NNVis:
         snum = Slider(axnum, 'Num', 1, 10*n, valinit=n, valstep=1)
         
         filtfunc = [lambda x:x]
-        
         
         big = max(losses)
         ax.set_title(f"$\eta$={net.eta:1.3e}")
@@ -108,7 +103,8 @@ class NNVis:
             
             net.eta = sfunc(seta.val)
             #seta.set_label("2.4e"%(self.net.eta,))
-            losses = filtfunc[0]([net.learn([fact]) for fact in bench.training_data_gen(n)])
+            #losses = filtfunc[0]([net.learn([fact]) for fact in bench.training_data_gen(n)])
+            losses = filtfunc[0](bench.learn(batches=n, batch_size=1))
             big = max(losses)
             ax.set_title(f"$\eta$={net.eta:1.3e}")
             loc[0].remove()
@@ -122,12 +118,15 @@ class NNVis:
         seta.on_changed(update)
         snum.on_changed(update)
 
-        resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
-        button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
+        resetax = plt.axes([0.7, 0.05, 0.2, 0.04])
+        button = Button(resetax, 'Randomize net', color=axcolor, hovercolor='0.975')
 
     
         def reset(event):
             self.seed += 1
+            self.bench.randomize_net()
+            #self.bench.checkpoint_net()
+            initial_state_vector = net.state_vector()
             update()
         button.on_clicked(reset)
 
@@ -146,7 +145,7 @@ class NNVis:
         radio.on_clicked(colorfunc)
 
         plt.show()
-        self.gc_protect.append((update, reset, colorfunc,seta,snum, radio, button))
+        self.gc_protect.append((update, reset, colorfunc, seta, snum, radio, button))
 
 
     def plot_trajectory(self, traja):
