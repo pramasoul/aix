@@ -4,18 +4,12 @@
 # ## A Neural Net lab bench
 # `nnbench.py`
 
-
-from matplotlib.widgets import Slider, Button, RadioButtons
 import numpy as np
 from scipy import ndimage
 
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator, LogLocator, FormatStrFormatter
-import plotly.graph_objects as go
-
 import dill
 import math
+import itertools
 
 """
     Terminology:
@@ -62,7 +56,7 @@ class NNBench:
                 self.input_width = layer.M.shape[1]
                 break
 
-        self.training_data_gen = self.training_data_gen_randn
+        ###self.training_data_gen = self.training_data_gen_randn
 
         # training_batch(n) returns a single batch of n truths
         # It may disregard n if necessary
@@ -70,7 +64,6 @@ class NNBench:
         self.training_batch = self.training_batch_from_gen
 
     def checkpoint_net(self):
-        #self.net_checkpoint = dill.dumps(self.net)
         self.net_checkpoint = self.net.state_vector()
 
     def rollback_net(self):
@@ -106,6 +99,17 @@ class NNBench:
         # before each lesson. Returns a list of the ordered pairs (state vector, loss).
         return [(self.net.state_vector(), self.net.learn([self.training_batch(batch_size)])) for i in range(batches)]
 
+    def accept_source_of_truth(self, iterable):
+        self.plato = itertools.cycle(iterable)
+
+    def training_data_gen(self, batch_size=1):
+        for i in range(batch_size):
+            yield next(self.plato)
+
+    def training_batch_from_gen(self, batch_size):
+        x, y = zip(*self.training_data_gen(batch_size))
+        return np.array(x), np.array(y)
+
     def training_data_gen_randn(self, n):
         """Yields n instances of labelled training data (aka "truths"). """
         np.random.seed(self.seed) #FIXME: chain forward
@@ -115,18 +119,14 @@ class NNBench:
             yield (v, self.ideal(v)) #FIXME: means to alter input
             #FIX by using a method to obtain examples from domain
 
-    def wRONG_training_data_gen_fixed(self, n):
+    def was_training_data_gen_fixed(self, n):
         len_td = len(self.training_data)
         for i in range(n):
             yield self.training_data[i % len_td]
 
-    def training_batch_from_gen(self, batch_size):
-        x, y = zip(*self.training_data_gen(batch_size))
-        return np.array(x), np.array(y)
-
-    def was_learn(self, n=100):
-        return [self.net.learn([fact]) for fact in self.training_data_gen(n)]
-
+    def training_data_gen_from_fixed(self, n):
+        for i in range(n):
+            yield next(self.fixed_training_data_iterator)
 
     def learning_potential(self, n=100, eta=None):
         starting_sv = self.net.state_vector()
