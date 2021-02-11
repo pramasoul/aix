@@ -64,6 +64,7 @@ class NNBench:
         # It may disregard n if necessary
         # It defaults to producing the batch by generating from truths
         self.training_batch = self.training_batch_from_gen
+        self.training_batch_cluster = self.training_batch_cluster_from_training_batch
 
     def __call__(self, net):
         self.net = net
@@ -105,13 +106,13 @@ class NNBench:
     def learn(self, batches=100, batch_size=1):
         # Trains the net by feeding it with batch clusters containing a single batch each,
         # obtaining thereby a loss value for each batch. Returns a list of the losses.
-        return [self.net.learn([self.training_batch(batch_size)]) for i in range(batches)]
+        return [self.net.learn(self.training_batch_cluster(batch_size)) for i in range(batches)]
 
     def learn_track(self, batches=100, batch_size=1):
         # Trains the net by feeding it with batch clusters containing a single batch each,
         # obtaining thereby a loss value for each batch. Records the net's state vector
         # before each lesson. Returns a list of the ordered pairs (state vector, loss).
-        return [(self.net.state_vector(), self.net.learn([self.training_batch(batch_size)])) for i in range(batches)]
+        return [(self.net.state_vector(), self.net.learn(self.training_batch_cluster(batch_size))) for i in range(batches)]
 
     def accept_source_of_truth(self, iterable):
         self.plato = itertools.cycle(iterable)
@@ -133,6 +134,9 @@ class NNBench:
             v = np.random.randn(width)
             yield (v, self.ideal(v)) #FIXME: means to alter input
             #FIX by using a method to obtain examples from domain
+
+    def training_batch_cluster_from_training_batch(self, n):
+        return [self.training_batch(n)]
 
     def was_training_data_gen_fixed(self, n):
         len_td = len(self.training_data)

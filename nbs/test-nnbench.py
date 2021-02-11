@@ -104,6 +104,39 @@ class TestNNBench(unittest.TestCase):
         self.assertEqual(pformat(expected), pformat(net.learn.mock_calls))
 
 
+    def test_training_data_literal_batch_cluster(self):
+        net = nn.Network()
+
+        # Setup for input width of 2
+        mock_layer = MagicMock()
+        mock_layer.M = np.zeros(2*3).reshape(3,2)
+        net.layers = [mock_layer]
+        bench = NNBench(net)
+
+        # A bench can accept a literal batch cluster
+        batch_1 = array([[ 1,  2],
+                         [ 4,  3]]), array([[ 5],
+                                            [10]])
+        # Batches can have different lengths (number of truths)
+        batch_2 = array([[-1,  3],
+                         [ 2, -2],
+                         [ 7, -1]]), array([[ 5],
+                                            [-2],
+                                            [ 5]])
+
+        # A batch cluster is a sequence of batches
+        batch_cluster = [batch_1, batch_2]
+
+        # The training_batch function can ignore size
+        bench.training_batch_cluster = lambda size: batch_cluster
+
+        # It feeds the net batches of the requested size, produced from Facts, by repetition
+        bench.learn(batches=2, batch_size=3)
+        expected = [call(batch_cluster),
+                    call(batch_cluster)]
+        self.assertEqual(pformat(expected), pformat(net.learn.mock_calls))
+
+
     def test_training_data_batching_from_literal(self):
         net = nn.Network()
 
