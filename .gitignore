@@ -127,3 +127,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Emacs backups
+*~
+
+# Old stuff
+*/OLD
+
+# Untitled notebooks
+Untitled*.ipynb
