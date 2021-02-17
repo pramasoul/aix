@@ -26,11 +26,11 @@ class NNVis:
     def plot_learning(self, batches=100, batch_size=1):
         bench = self.bench
         losses = bench.learn(batches=batches, batch_size=batch_size)
-        fig, ax = plt.subplots(dpi=226)  # Create a figure and an axes.
-        ax.plot(losses, label=f"$\eta={bench.net.eta}$")  # Plot some data on the axes.
-        ax.set_xlabel('learnings')  # Add an x-label to the axes.
-        ax.set_ylabel('loss')  # Add a y-label to the axes.
-        ax.set_title("Losses")  # Add a title to the axes.
+        fig, ax = plt.subplots(dpi=226)
+        ax.plot(losses, label=f"$\eta={bench.net.eta:.4g}$")
+        ax.set_xlabel('learnings')
+        ax.set_ylabel('loss')
+        ax.set_title("Losses")
         ax.set_yscale('log')
         ax.legend()  # Add a legend.        
 
