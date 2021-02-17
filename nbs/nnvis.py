@@ -14,7 +14,6 @@ from matplotlib import cm
 from matplotlib.ticker import LinearLocator, LogLocator, FormatStrFormatter
 import plotly.graph_objects as go
 
-import dill
 import math
 
 
@@ -27,7 +26,7 @@ class NNVis:
     def plot_learning(self, batches=100, batch_size=1):
         bench = self.bench
         losses = bench.learn(batches=batches, batch_size=batch_size)
-        fig, ax = plt.subplots()  # Create a figure and an axes.
+        fig, ax = plt.subplots(dpi=226)  # Create a figure and an axes.
         ax.plot(losses, label=f"$\eta={bench.net.eta}$")  # Plot some data on the axes.
         ax.set_xlabel('learnings')  # Add an x-label to the axes.
         ax.set_ylabel('loss')  # Add a y-label to the axes.
@@ -41,7 +40,12 @@ class NNVis:
         y = np.log2(cube['rates'])
         z = np.log10(cube['losses'])
         fig = go.Figure(data = go.Surface(z = z, y = y))
-        fig.update_layout(width=800, height=800)
+        fig.update_layout(scene = dict(
+                    xaxis_title=r'batch',
+                    yaxis_title=r'$log_2(rates)$',
+                    zaxis_title=r'$log_10(loss)$'),
+                    width=800, height=800,
+                    margin=dict(r=20, b=10, l=10, t=10))
         fig.show()
         
     def knobs_plot_learning(self, batches=100, batch_size=1):
@@ -49,8 +53,7 @@ class NNVis:
         bench = self.bench
         net = bench.net
         initial_state_vector = net.state_vector()
-        # from matplotlib import pyplot as plt
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(dpi=226)
         plt.subplots_adjust(left=0.25, bottom=0.25)
         a0 = 5
         f0 = 3
@@ -98,13 +101,12 @@ class NNVis:
 
         def update(val,ax=ax,loc=[l]):
             n = int(snum.val)
-            #net = dill.loads(pickled_net)
             net.set_state_from_vector(initial_state_vector)
             
             net.eta = sfunc(seta.val)
             #seta.set_label("2.4e"%(self.net.eta,))
             #losses = filtfunc[0]([net.learn([fact]) for fact in bench.training_data_gen(n)])
-            losses = filtfunc[0](bench.learn(batches=n, batch_size=1))
+            losses = filtfunc[0](bench.learn(batches=n, batch_size=batch_size))
             big = max(losses)
             ax.set_title(f"$\eta$={net.eta:1.3e}")
             loc[0].remove()
@@ -150,7 +152,7 @@ class NNVis:
 
     def plot_trajectory(self, traja):
         # Development space for plotting:
-        fig, ax = plt.subplots()  # Create a figure and an axes.
+        fig, ax = plt.subplots(dpi=226)  # Create a figure and an axes.
         traj_color = 'xkcd:red'
         loss_color = 'xkcd:blue'
         cos_color = 'xkcd:green'
@@ -171,6 +173,7 @@ class NNVis:
         #ax2.legend()  # Add a legend.
         fig.tight_layout()  # otherwise the right y-label is slightly clipped
         plt.show()
+
 
 #-----------------------------------------------------------------------------------------------
 if False: #boneyard
