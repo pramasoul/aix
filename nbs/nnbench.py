@@ -11,6 +11,8 @@ import dill
 import math
 import itertools
 
+from deprecated.sphinx import deprecated
+
 """
     Terminology:
       Batch: an ordered pair of (x, ideal), where x and ideal can be vectors
@@ -44,6 +46,7 @@ class Thing:
         self.__dict__.update(kwargs)
 
 class NNBench:
+    @staticmethod
     def net_input_width(net):
         # Hack to figure out the input width of the net
         input_width = None
@@ -112,7 +115,8 @@ class NNBench:
         # Trains the net by feeding it with batch clusters containing a single batch each,
         # obtaining thereby a loss value for each batch. Records the net's state vector
         # before each lesson. Returns a list of the ordered pairs (state vector, loss).
-        return [(self.net.state_vector(), self.net.learn(self.training_batch_cluster(batch_size))) for i in range(batches)]
+        return [(self.net.state_vector(), self.net.learn(self.training_batch_cluster(batch_size))) \
+                for i in range(batches)]
 
     def accept_source_of_truth(self, iterable):
         self.plato = itertools.cycle(iterable)
@@ -126,6 +130,11 @@ class NNBench:
         x, y = zip(*self.training_data_gen(batch_size))
         return np.array(x), np.array(y)
 
+    def training_batch_cluster_from_training_batch(self, n):
+        return [self.training_batch(n)]
+
+    @deprecated(reason="Too limited. Use `accept_source_of_truth` or another method.",
+               category=FutureWarning)
     def training_data_gen_randn(self, n):
         """Yields n instances of labelled training data (aka "truths"). """
         np.random.seed(self.seed) #FIXME: chain forward
@@ -135,14 +144,8 @@ class NNBench:
             yield (v, self.ideal(v)) #FIXME: means to alter input
             #FIX by using a method to obtain examples from domain
 
-    def training_batch_cluster_from_training_batch(self, n):
-        return [self.training_batch(n)]
-
-    def was_training_data_gen_fixed(self, n):
-        len_td = len(self.training_data)
-        for i in range(n):
-            yield self.training_data[i % len_td]
-
+    @deprecated(reason="Too limited. Use `accept_source_of_truth` or another method.",
+               category=FutureWarning)
     def training_data_gen_from_fixed(self, n):
         for i in range(n):
             yield next(self.fixed_training_data_iterator)
