@@ -7,11 +7,13 @@
 import numpy as np
 from scipy import ndimage
 
+from collections import deque, namedtuple
 import dill
-import math
 import itertools
 
 from deprecated.sphinx import deprecated
+
+from nn import Network
 
 """
     Terminology:
@@ -202,5 +204,56 @@ class NNBench:
                    loss_steps = loss_steps,
                    traj_L2 = traj_L2,
                    traj_cos = traj_cos
+                  )
+        return rv
+
+################################################################################
+# NNMEG is an instrumented version of nn.Network
+class NNMEG(Network):
+    """An instrumented subclass of nn.Network"""
+
+    def __init__(self):
+        super().__init__()
+        meg = self._meg = Thing()
+        meg.states = deque([], 3)
+        meg.losses = deque([], 3)
+        self._Deltas = namedtuple('Deltas', 'loss loss_step traj_L2 traj_cos')
+
+
+    def learn(self, facts, eta=None):
+        """learn, recording state and loss"""
+        meg = self._meg
+        meg.states or meg.states.append(self.state_vector()) # Capture the initial state
+        loss = super().learn(facts, eta)
+        meg.states.append(self.state_vector())
+        meg.losses.append(loss)
+        return loss
+
+    def delta_data(self):
+        """Calculate the deltas of interest"""
+        meg = self._meg
+        trajectory = np.array(meg.states)
+        losses = np.array(meg.losses)
+
+        # Take first differences, which represent the changes at each step
+        traj_steps = np.diff(trajectory, axis=0)
+        loss_steps = np.diff(losses, axis=0)
+
+        # Find the L2 norm of the trajectory steps  ‖𝑡𝑟𝑎𝑗‖
+        traj_L2 = np.sqrt(np.einsum('...i,...i', traj_steps, traj_steps))
+        #traj_l2 = np.linalg.norm(delta_sv)
+
+        # Find the angles between trajectory steps, from
+        # 𝐚⋅𝐛 = ‖𝐚‖‖𝐛‖ cos𝜃
+        # cos𝜃 = 𝐚⋅𝐛 / ‖𝐚‖‖𝐛‖
+        # where 𝐚 and 𝐛 are a state-space trajectory step and the succeeding step respectively
+        trajn_dot_nplus1 = np.einsum('...i,...i', traj_steps[:-1], traj_steps[1:])
+        traj_cos_denom = np.multiply(traj_L2[:-1], traj_L2[1:])
+        traj_cos = np.divide(trajn_dot_nplus1, traj_cos_denom, where=traj_cos_denom!=0.0)
+
+        rv = self._Deltas(loss = losses[-1],
+                   loss_step = loss_steps[-1],
+                   traj_L2 = traj_L2[-1],
+                   traj_cos = traj_cos[-1]
                   )
         return rv
