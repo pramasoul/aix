@@ -229,7 +229,7 @@ class NNMEG(Network):
         meg.losses.append(loss)
         return loss
 
-    def delta_data(self):
+    def deltas(self):
         """Calculate the deltas of interest"""
         meg = self._meg
         trajectory = np.array(meg.states)
@@ -251,9 +251,35 @@ class NNMEG(Network):
         traj_cos_denom = np.multiply(traj_L2[:-1], traj_L2[1:])
         traj_cos = np.divide(trajn_dot_nplus1, traj_cos_denom, where=traj_cos_denom!=0.0)
 
-        rv = self._Deltas(loss = losses[-1],
+        if len(traj_cos) > 0:
+            rv = self._Deltas(loss = losses[-1],
                    loss_step = loss_steps[-1],
                    traj_L2 = traj_L2[-1],
                    traj_cos = traj_cos[-1]
                   )
+        else:
+            rv = self._Deltas(*[0.0]*4)
         return rv
+
+
+class NetMaker():
+    """Makes a Network from a shorthand string"""
+    p1 = re.compile('^(\d+)((x\d+[rst])+)$')
+    p2 = re.compile('x(\d+)([rst])')
+    funlayers = {'r': (lambda x: max(0.0, x), lambda d: 1 if d>0 else 0),
+                 's': (np.sin, np.cos),
+                 't': (np.tanh, lambda d: 1.0 - np.tanh(d)**2),
+                }
+    def __init__(self):
+        pass
+
+    def __call__(self, shorthand):
+        net = Network()
+        m1 = self.p1.match(shorthand)
+        widths = [int(m1.group(1))]
+        for match in self.p2.finditer(m1.group(2)):
+            nstr, funcode = match.groups()
+            widths.append(int(nstr))
+            net.extend(AffineLayer(*widths[-2:]))
+            net.extend(MapLayer(*self.funlayers[funcode]))
+        return net
