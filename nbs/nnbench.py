@@ -271,11 +271,11 @@ class NetMaker():
                  's': (np.sin, np.cos),
                  't': (np.tanh, lambda d: 1.0 - np.tanh(d)**2),
                 }
-    def __init__(self):
-        pass
+    def __init__(self, cls=Network):
+        self.cls = cls
 
     def __call__(self, shorthand):
-        net = Network()
+        net = self.cls()
         m1 = self.p1.match(shorthand)
         if not m1:
             raise TypeError(f"mal-formed shorthand string {shorthand}")
