@@ -10,10 +10,11 @@ from scipy import ndimage
 from collections import deque, namedtuple
 import dill
 import itertools
+import re
 
 from deprecated.sphinx import deprecated
 
-from nn import Network
+from nn import Network, AffineLayer, MapLayer
 
 """
     Terminology:
@@ -264,8 +265,8 @@ class NNMEG(Network):
 
 class NetMaker():
     """Makes a Network from a shorthand string"""
-    p1 = re.compile('^(\d+)((x\d+[rst])+)$')
-    p2 = re.compile('x(\d+)([rst])')
+    p1 = re.compile('^(\d+)((x\d+[rst]?)+)$')
+    p2 = re.compile('x(\d+)([rst]?)')
     funlayers = {'r': (lambda x: max(0.0, x), lambda d: 1 if d>0 else 0),
                  's': (np.sin, np.cos),
                  't': (np.tanh, lambda d: 1.0 - np.tanh(d)**2),
@@ -276,10 +277,13 @@ class NetMaker():
     def __call__(self, shorthand):
         net = Network()
         m1 = self.p1.match(shorthand)
+        if not m1:
+            raise TypeError(f"mal-formed shorthand string {shorthand}")
         widths = [int(m1.group(1))]
         for match in self.p2.finditer(m1.group(2)):
             nstr, funcode = match.groups()
             widths.append(int(nstr))
             net.extend(AffineLayer(*widths[-2:]))
-            net.extend(MapLayer(*self.funlayers[funcode]))
+            if funcode:
+                net.extend(MapLayer(*self.funlayers[funcode]))
         return net

@@ -6,7 +6,7 @@ import numpy as np
 from numpy import array
 import sympy
 
-from nnbench import NNBench
+from nnbench import NNBench, NetMaker
 import nn
 
 def arangep(n, starting_index=0):
@@ -14,7 +14,7 @@ def arangep(n, starting_index=0):
     return np.array(sympy.sieve._list[starting_index:starting_index + n])
 
 
-class TestNNBench(unittest.TestCase):
+class NNBenchTest(unittest.TestCase):
     def create_patch(self, name):
         patcher = patch(name)
         thing = patcher.start()
@@ -243,18 +243,80 @@ class TestNNBench(unittest.TestCase):
         self.assertEqual(pformat(expected), pformat(net.learn.mock_calls))
 
 
-
-class MyTest(unittest.TestCase):
-    def setUp(self):
-        patcher = patch('nn.Network')
-        self.MockClass = patcher.start()
+class NetMakerTest(unittest.TestCase):
+    def create_patch(self, name):
+        patcher = patch(name, autospec=True)
+        thing = patcher.start()
         self.addCleanup(patcher.stop)
+        return thing
 
-    def test_something(self):
-        assert nn.Network is self.MockClass
+    def setUp(self):
+        self.mockNetwork = self.create_patch('nn.Network')
+        self.mockAffineLayer = self.create_patch('nn.AffineLayer')
+        self.mockMapLayer = self.create_patch('nn.MapLayer')
 
-    def test_other(self):
-        assert nn.Network is self.MockClass
+    def test_is_patched(self):
+        assert nn.Network is self.mockNetwork
+        assert nn.AffineLayer is self.mockAffineLayer
+        assert nn.MapLayer is self.mockMapLayer
+
+    def test_NM_does_not_make_Network_on_creation(self):
+        # Creating a NetMaker does not create a Network
+        nm = NetMaker()
+        self.mockNetwork.assert_not_called()
+        self.mockAffineLayer.assert_not_called()
+        self.mockMapLayer.assert_not_called()
+
+    def test_NM_asserts_bad_arguments(self):
+        nm = NetMaker()
+        # Calling a NetMaker with no arguments raises an error
+        with self.assertRaises(TypeError):
+            a_net = nm()
+
+        # Calling a NetMaker with non-string raises an error
+        with self.assertRaises(TypeError):
+            a_net = nm(1)
+
+        # Calling a NetMaker with wrong number of args raises an error
+        with self.assertRaises(TypeError):
+            a_net = nm('1x4t', '1s4')
+
+        # Calling a NetMaker with bad net shorthand raises an error
+        for s in ['w', '1x8tx3tx', '1x8cx3t', '1xx2', '1x8trx3t',
+                  '-3.14x2.78']:
+            with self.assertRaises(TypeError):
+                a_net = nm(s)
+
+    def x_test_NM_returns_a_Network_instance(self):
+        nm = NetMaker()
+        a_net = nm('1x3')
+        print(a_net)
+        print(self.mockNetwork.mock_calls)
+        self.assertEqual(a_net, self.mockNetwork.return_value)
+
+    @unittest.skip("Test is defective")
+    def test_NM_returns_a_Network_instance(self):
+        with patch('nn.Network') as mock:
+            nm = NetMaker()
+            a_net = nm('1x3')
+            print(a_net)
+            print(self.mockNetwork.mock_calls)
+            self.assertEqual(a_net, self.mockNetwork.return_value)
+
+    @unittest.skip("Test is defective")
+    def test_NM_accepts_good_arguments(self):
+        nm = NetMaker()
+        for s in '1x3 1x8rx3t 7x1 3x1sx4tx1rx5r'.split():
+            a_net = nm(s)
+            print(a_net)
+            print(self.mockNetwork.mock_calls)
+            self.assertEqual(a_net, self.mockNetwork.return_value)
+
+    def test_NM_invokes_correct_layers(self):
+        nm = NetMaker()
+        a_net = nm('3x1sx4tx1rx5r')
+
+
 
 class DemoTest(unittest.TestCase):
     def create_patch(self, name):
