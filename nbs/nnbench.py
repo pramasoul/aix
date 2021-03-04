@@ -286,4 +286,5 @@ class NetMaker():
             net.extend(AffineLayer(*widths[-2:]))
             if funcode:
                 net.extend(MapLayer(*self.funlayers[funcode]))
+        net.shorthand = shorthand
         return net
