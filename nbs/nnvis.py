@@ -9,6 +9,7 @@ from matplotlib.widgets import Slider, Button, RadioButtons
 import numpy as np
 from scipy import ndimage
 
+import bqplot as bq
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, LogLocator, FormatStrFormatter
@@ -22,7 +23,7 @@ class NNVis:
         self.bench = bench
         self.gc_protect = []
         self.seed = 3
-    
+
     def plot_learning(self, batches=100, batch_size=1):
         bench = self.bench
         losses = bench.learn(batches=batches, batch_size=batch_size)
@@ -32,7 +33,7 @@ class NNVis:
         ax.set_ylabel('loss')
         ax.set_title("Losses")
         ax.set_yscale('log')
-        ax.legend()  # Add a legend.        
+        ax.legend()  # Add a legend.
 
     def plot_loss_cube(self, cube=None):
         if cube is None:
@@ -47,7 +48,7 @@ class NNVis:
                     width=800, height=800,
                     margin=dict(r=20, b=10, l=10, t=10))
         fig.show()
-        
+
     def knobs_plot_learning(self, batches=100, batch_size=1):
         n = batches
         bench = self.bench
@@ -57,7 +58,7 @@ class NNVis:
         plt.subplots_adjust(left=0.25, bottom=0.25)
         a0 = 5
         f0 = 3
-        
+
         ###
         losses = bench.learn(batches=batches, batch_size=batch_size)
         l, = ax.plot(losses, label=f"$\eta={net.eta}$")
@@ -70,17 +71,17 @@ class NNVis:
         axcolor = 'lightgoldenrodyellow'
         axeta = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
         axnum = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
-        
+
         def sfunc(x):
             return 2**(-1.005/(x+.005))
         def sinv(x):
             return (-1.005/math.log2(x))-.005
-        
+
         seta = Slider(axeta, '$\eta$', 0, 1, valinit=sinv(net.eta))
         snum = Slider(axnum, 'Num', 1, 10*n, valinit=n, valstep=1)
-        
+
         filtfunc = [lambda x:x]
-        
+
         big = max(losses)
         ax.set_title(f"$\eta$={net.eta:1.3e}")
         nlayers = [i for i in range(len(net.layers)) if hasattr(net.layers[i], 'M')]
@@ -102,7 +103,7 @@ class NNVis:
         def update(val,ax=ax,loc=[l]):
             n = int(snum.val)
             net.set_state_from_vector(initial_state_vector)
-            
+
             net.eta = sfunc(seta.val)
             #seta.set_label("2.4e"%(self.net.eta,))
             #losses = filtfunc[0]([net.learn([fact]) for fact in bench.training_data_gen(n)])
@@ -123,7 +124,7 @@ class NNVis:
         resetax = plt.axes([0.7, 0.05, 0.2, 0.04])
         button = Button(resetax, 'Randomize net', color=axcolor, hovercolor='0.975')
 
-    
+
         def reset(event):
             self.seed += 1
             self.bench.randomize_net()
@@ -135,7 +136,7 @@ class NNVis:
         rax = plt.axes([0.025, 0.025, 0.15, 0.15], facecolor=axcolor)
         radio = RadioButtons(rax, ('raw', 'low pass', 'green'), active=0)
 
-        
+
         def colorfunc(label):
             if label == "raw":
                 filtfunc[0] = lambda x:x
@@ -175,6 +176,55 @@ class NNVis:
         plt.show()
 
 
+class ADCResponsePlot():
+    def __init__(self, margin=20,
+                 min_aspect_ratio=0.5,
+                 max_aspect_ratio=2,
+                 title=None,
+                 **kwargs):
+        x = np.arange(-0.125, 1.125, 0.001)
+        xs = bq.LinearScale()
+        ys = bq.LinearScale()
+        xax = bq.Axis(scale=xs, label='input')
+        yax = bq.Axis(scale=ys, orientation='vertical', label='bits')
+        line = bq.Lines(x=x, y=x, scales={'x': xs, 'y': ys})
+        fig = self.fig = bq.Figure(marks=[line], axes=[xax, yax],
+                                   min_aspect_ratio=min_aspect_ratio,
+                                   max_aspect_ratio=max_aspect_ratio,
+                                   title=title)
+        dictfilt = lambda x, y: dict([ (i,x[i]) for i in x if i in set(y) ])
+        fig.fig_margin = kwargs.get('fig_margin') \
+            or dict(top=margin, bottom=margin, left=margin, right=margin)
+        layout_defaults = {}
+        layout_defaults.update(dictfilt(kwargs, ('height', 'width')))
+        fig.layout = layout_defaults
+
+    def __call__(self, fun):
+        fig = self.fig
+        line = fig.marks[0]
+        #outs = np.array([fun(x) for x in line.x])
+        outs = fun(line.x.reshape(-1,1))
+        y = np.swapaxes(outs, 0, 1)
+        line.y = y
+        #return fig
+        return self
+
+
+class NetResponsePlot(ADCResponsePlot):
+    def __init__(self, net, **kwargs):
+        super().__init__(**kwargs)
+        self.net = net
+
+    def __call__(self, state_vector=None):
+        net = self.net
+        if state_vector is not None:
+            net.set_state_from_vector(state_vector)
+        fig = self.fig
+        line = fig.marks[0]
+        outs = net(line.x.reshape(-1,1))
+        y = np.swapaxes(outs, 0, 1)
+        line.y = y
+        return self
 #-----------------------------------------------------------------------------------------------
 if False: #boneyard
     def mpl_plot_loss_cube(self, cube=None):
