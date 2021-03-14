@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+
+  gpu-jupyter:
+    image: gpu-jupyter
+    environment:
+      - GRANT_SUDO=yes
+      - JUPYTER_ENABLE_LAB=yes
+    volumes:
+      - type: bind
+        source: /home/soul/Projects/aix
+        target: /home/jovyan/work
+      - type: bind
+        source: /data-pool/nn
+        target: /data
+    ports:
+      - "8848:8888" # JupyterLab
+      - "5555:5555" # flower
+    user: root
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu, utility]
+
+  neo4j:
+    image: neo4j:latest
+    environment:
+      - NEO4J_AUTH=neo4j/test
+    volumes:
+      - type: bind
+        source: /data-pool/soul/neo4j/data
+        target: /data
+      - type: bind
+        source: /data-pool/soul/neo4j/logs
+        target: /logs
+      - type: bind
+        source: /data-pool/soul/neo4j/import
+        target: /var/lib/neo4j/import
+      - type: bind
+        source: /data-pool/soul/neo4j/plugins
+        target: /plugins
+    ports:
+      - "7373:7373"
+      - "7474:7474"
+      - "7687:7687"
+
+  rabbitmq:
+    image: rabbitmq:3-management
