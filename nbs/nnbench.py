@@ -218,7 +218,7 @@ class NNMEG(Network):
         meg = self._meg = Thing()
         meg.states = deque([], 3)
         meg.losses = deque([], 3)
-        self._Deltas = namedtuple('Deltas', 'loss loss_step traj_L2 traj_cos')
+        self._Deltas = namedtuple('Deltas', 'loss loss_step traj_L2_sq traj_cos_sq_signed')
 
 
     def learn(self, facts, eta=None):
@@ -240,26 +240,41 @@ class NNMEG(Network):
         traj_steps = np.diff(trajectory, axis=0)
         loss_steps = np.diff(losses, axis=0)
 
-        # Find the L2 norm of the trajectory steps  ‖𝑡𝑟𝑎𝑗‖
-        traj_L2 = np.sqrt(np.einsum('...i,...i', traj_steps, traj_steps))
+        # Find the squared L2 norm of the trajectory steps  ‖𝑡𝑟𝑎𝑗‖
+        traj_L2_sq = np.einsum('...i,...i', traj_steps, traj_steps)
         #traj_l2 = np.linalg.norm(delta_sv)
 
         # Find the angles between trajectory steps, from
         # 𝐚⋅𝐛 = ‖𝐚‖‖𝐛‖ cos𝜃
         # cos𝜃 = 𝐚⋅𝐛 / ‖𝐚‖‖𝐛‖
         # where 𝐚 and 𝐛 are a state-space trajectory step and the succeeding step respectively
-        trajn_dot_nplus1 = np.einsum('...i,...i', traj_steps[:-1], traj_steps[1:])
-        traj_cos_denom = np.multiply(traj_L2[:-1], traj_L2[1:])
-        traj_cos = np.divide(trajn_dot_nplus1, traj_cos_denom, where=traj_cos_denom!=0.0)
+        # It is computationally more efficient, and preserving of more precision, to find
+        # the squared form:  cos2𝜃=(𝐚⋅𝐛)2/(𝐚⋅𝐚)(𝐛⋅𝐛)
+        # But keep the sign
+        trajn_dot_nminus1 = np.einsum('...i,...i', traj_steps[:-1], traj_steps[1:])
+        trajn_dot_nminus1_sq_signed = np.multiply(trajn_dot_nminus1, np.abs(trajn_dot_nminus1))
+        traj_cos2_denom = np.multiply(traj_L2_sq[:-1], traj_L2_sq[1:])
+        traj_cos2_signed = np.divide(trajn_dot_nminus1_sq_signed, traj_cos2_denom, where=traj_cos2_denom!=0.0)
 
-        if len(traj_cos) > 0:
+        if len(traj_cos2_signed) > 0:
             rv = self._Deltas(loss = losses[-1],
-                   loss_step = loss_steps[-1],
-                   traj_L2 = traj_L2[-1],
-                   traj_cos = traj_cos[-1]
-                  )
+                              loss_step = loss_steps[-1],
+                              traj_L2_sq = traj_L2_sq[-1],
+                              traj_cos_sq_signed = traj_cos2_signed[-1],
+                             )
+        elif len(loss_steps) > 0:
+            rv = self._Deltas(loss = losses[-1],
+                              loss_step = loss_steps[-1],
+                              traj_L2_sq = traj_L2_sq[-1],
+                              traj_cos_sq_signed = 0,
+                             )
         else:
-            rv = self._Deltas(*[0.0]*4)
+            rv = self._Deltas(loss = losses[-1],
+                              loss_step = 0,
+                              traj_L2_sq = 0,
+                              traj_cos_sq_signed = 0,
+                             )
+
         return rv
 
 

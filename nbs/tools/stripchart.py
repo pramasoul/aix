@@ -94,8 +94,56 @@ class BQStripchart():
         How does JL do it? I'm still trying to figure that out.)
             Just reference the <code>.fig</code> member directly instead for now."""
 
+# A stripchart that handles non-uniform intervals
+class NUStripchart():
+    def __init__(self, data_len, title, y_label,
+                 margin=20,
+                 min_aspect_ratio=0.5,
+                 max_aspect_ratio=2,
+                 log_scale = False, **kwargs):
+        self.data_len = data_len
+        self.xdq = deque([], data_len)
+        self.ydq = deque([], data_len)
+        xs = bq.LinearScale()
+        ys = log_scale and bq.LogScale() or bq.LinearScale()
+        xax = bq.Axis(scale=xs, label='batch', num_ticks=4)
+        yax = bq.Axis(scale=ys, orientation='vertical', label=y_label, num_ticks=4)
+        scat = self.scat = bq.Lines(x=list(self.xdq), y=list(self.ydq),
+                                      scales={'x': xs, 'y': ys},
+                                      min_aspect_ratio=min_aspect_ratio,
+                                      max_aspect_ratio=max_aspect_ratio,
+                                      default_size = 3,
+                                      colors=['#15b01a'])
+        self.fig = bq.Figure(marks=[scat], axes=[xax, yax], title=title)
+        # https://stackoverflow.com/a/20256491/3870917 tweaked:
+        dictfilt = lambda x, y: dict(((i,x[i]) for i in x if i in set(y)))
+        self.fig.layout = dictfilt(kwargs, ('height', 'width'))
+
+    def __call__(self, new_data):
+        batch, loss = new_data
+        self.xdq.append(batch)
+        self.ydq.append(loss)
+        scat = self.scat
+        with self.fig.hold_sync():
+            scat.x = list(self.xdq)
+            scat.y = list(self.ydq)
+            self.fig.title = "mean = %.4e" % np.mean(list(self.ydq)[-10:])
+
+    ## FIXME
+    def _repr_html_(self):
+        #return self.fig._repr_html_()
+        return r"""<strong>FIXME:</strong> Sorry, this doesn't work yet.
+        (<code>'Figure' object has no attribute '_repr_html_'</code>!
+        How does JL do it? I think an ipywidgets.Widget is needed.)
+            Just reference the <code>.fig</code> member directly instead for now."""
+
+# A stripchart more appropriate for tracking loss
 class Losschart():
-    def __init__(self, data_len, **kwargs):
+    def __init__(self, data_len, margin=20,
+                 min_aspect_ratio=0.5,
+                 max_aspect_ratio=2,
+                 title=None,
+                 **kwargs):
         self.data_len = data_len
         self.xdq = deque([], data_len)
         self.ydq = deque([], data_len)
@@ -103,10 +151,15 @@ class Losschart():
         ys = bq.LogScale()
         xax = bq.Axis(scale=xs, label='batch', num_ticks=4)
         yax = bq.Axis(scale=ys, orientation='vertical', label='loss', num_ticks=4)
-        scat = self.scat = bq.Scatter(x=list(self.xdq), y=list(self.ydq),
+        scat = self.scat = bq.Lines(x=list(self.xdq), y=list(self.ydq),
                                       scales={'x': xs, 'y': ys},
-                                      default_size = 5)
+                                      min_aspect_ratio=min_aspect_ratio,
+                                      max_aspect_ratio=max_aspect_ratio,
+                                      default_size = 3,
+                                      colors=['#0343df'])
         self.fig = bq.Figure(marks=[scat], axes=[xax, yax], title='Loss')
+        self.fig.fig_margin = kwargs.get('fig_margin') \
+            or dict(top=margin, bottom=margin, left=margin, right=margin)
         # https://stackoverflow.com/a/20256491/3870917 :
         dictfilt = lambda x, y: dict([ (i,x[i]) for i in x if i in set(y) ])
         self.fig.layout = dictfilt(kwargs, ('height', 'width'))
@@ -126,6 +179,6 @@ class Losschart():
         #return self.fig._repr_html_()
         return r"""<strong>FIXME:</strong> Sorry, this doesn't work yet.
         (<code>'Figure' object has no attribute '_repr_html_'</code>!
-        How does JL do it? I'm still trying to figure that out.)
+        How does JL do it? I think an ipywidgets.Widget is needed.)
             Just reference the <code>.fig</code> member directly instead for now."""
 

@@ -55,14 +55,14 @@ query_write_yield = functools.partial(query_yield, r_or_w='w')
 class NumpyStore():
     def __init__(self, driver):
         self.driver = driver
-    
+
     @staticmethod
     def _np_to_key(a):
         m = sha256(a)
         m.update(a.dtype.name.encode('utf8'))
         m.update(str(a.shape).encode('utf8'))
         return m.hexdigest()[:16]
-    
+
     @staticmethod
     def _add_np(tx, a, k):
         tx.run("MERGE (:ndarray {k: $k, dtype: $dtype, shape: $shape, bytes: $bytes})",
@@ -70,7 +70,7 @@ class NumpyStore():
                dtype=a.dtype.name,
                shape=list(a.shape),
                bytes=a.tobytes())
-        
+
     @staticmethod
     def _get_np(tx, k):
         response = tx.run("MATCH (a:ndarray) WHERE a.k = $k "
@@ -85,7 +85,18 @@ class NumpyStore():
             raise KeyError
         else:
             return a
-        
+
+    @staticmethod
+    def _dedup(tx):
+        q = """
+MATCH (n:ndarray)
+WITH n.k as k, collect(n) AS nds
+WHERE size(nds) > 1
+FOREACH (n in tail(nds) | DELETE n)
+"""
+        tx.run(q)
+
+
     def _tput(self, a):
         k = self._np_to_key(a)
         with self.driver.session() as session:
@@ -100,10 +111,14 @@ class NumpyStore():
 
     def store(self, a):
         return self._tput(a)
-    
+
     def retrieve(self, key):
         return self._tget(k)
-    
+
+    def dedup(self):
+        with self.driver.session() as session:
+            session.write_transaction(self._dedup)
+
     def __getitem__(self, k):
         return self._tget(k)
 
@@ -118,4 +133,3 @@ class NumpyStore():
 
     def __len__(self):
         raise NotImplementedError
-
