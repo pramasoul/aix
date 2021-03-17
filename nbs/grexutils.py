@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Graph Experiment 2 utilities
+# # Graph Experiment utilities
 
 import numpy as np
-from nnbench import NetMaker, NNMEG
+from nnbench import netMaker
 import time
 import tools.neotools as nj
 
 import neo4j
 from collections import defaultdict
 
+# https://neo4j.com/docs/cypher-manual/current/styleguide/
 
 # Methods to create nodes in the experiment graph
 
@@ -21,7 +22,7 @@ CREATE (e:Experiment {name: $experiment_name,
                         ts: timestamp()})
 """
     nj.query_write(driver, q, **kwargs)
-    
+
 def create_a_procedure(driver, **kwargs):
     q = """
 MATCH (e:Experiment {unikey: $experiment_unikey})
@@ -32,7 +33,7 @@ CREATE (e)-[:INCLUDES]->
                ts: timestamp()})
 """
     nj.query_write(driver, q, **kwargs)
-    
+
 def create_parameters_to_experiment_procedure(driver, **kwargs):
     q = """
 MATCH (proc:Procedure {unikey: $procedure_unikey})
@@ -46,7 +47,14 @@ CREATE (proc)-[:INCORPORATES]->
 """
     nj.query_write(driver, q, **kwargs)
 
-# ## Methods to acquire work
+# Functions to get Experiments:
+
+def get_experiment_names_keys(driver):
+    q="""
+MATCH (e:Experiment)
+RETURN e.name as name, e.unikey as key
+"""
+    return [(r['name'], r['key']) for r in nj.query_read_yield(driver, q)]
 
 def get_experiment_key_from_name(driver, name):
     q="""
@@ -59,6 +67,8 @@ RETURN e.unikey as unikey
     if len(records) > 1:
         raise KeyError(f'Found {len(records)} experiments with name "{name}"')
     return records[0]['unikey']
+
+# Functions to get Procedures:
 
 def get_procedure_names_keys_from_experiment_key(driver, key):
     q = """
@@ -76,15 +86,25 @@ MATCH (e:Experiment {name: $ex_name})
 -[:INCORPORATES]->(par:Parameters)
 RETURN par.name as name, par.unikey as key
 """
-    return [(r['name'], r['key']) for r in 
+    return [(r['name'], r['key']) for r in
             nj.query_read_yield(driver, q, ex_name=ex_name, proc_name=proc_name)]
+
+def parameter_names_keys_from_experiment_and_procedure_keys(driver, ex_key, proc_key):
+    q = """
+MATCH (e:Experiment {unikey: $ex_key})
+-[:INCLUDES]->(proc:Procedure {unikey: $proc_key})
+-[:INCORPORATES]->(par:Parameters)
+RETURN par.name as name, par.unikey as key
+"""
+    return [(r['name'], r['key']) for r in
+            nj.query_read_yield(driver, q, ex_key=ex_key, proc_key=proc_key)]
 
 def get_unstarted_parameters_of_procedure(driver, **kwargs):
     q="""
 MATCH (:Procedure {unikey: $procedure_unikey})
 -[:INCORPORATES]->
 (par:Parameters)
-WHERE NOT (par)-[:CONFIGURES]->(:net)
+WHERE NOT (par)-[:CONFIGURES]->(:Net)
 RETURN par.unikey as unikey
 """
     return [r['unikey'] for r in nj.query_read_yield(driver, q, **kwargs)]
@@ -99,7 +119,10 @@ MATCH (e:Experiment {unikey: $experiment_unikey})
 RETURN par.prepend_code_strings, proc.code_strings, par.append_code_strings
 """
     records = nj.query_read_return_list(driver, q, **kwargs)
-    assert len(records) == 1
+    if len(records) < 1:
+        raise KeyError(f'No experiment,procedure,parameters found to match "{kwargs}"')
+    if len(records) > 1:
+        raise KeyError(f'Found {len(records)} experiment,procedure,parameters "{kwargs}"')
     r = records[0]
     #print(f"r['proc.code_strings'] = {r['proc.code_strings']}")
     #print(f"r['par.code_strings'] = {r['par.code_strings']}")
@@ -128,3 +151,87 @@ def now_run_it(driver, code_strings):
         exec(s, cx)
     nps = nj.NumpyStore(driver)
     cx['run_it'](cx, driver, nps)
+
+################################################################################
+# python Object representations of graph nodes
+
+class UnikeyedObjectProperty:
+    def __set_name__(self, owner, attr_name):
+        #print(owner.__name__)
+        self.owner = owner
+        self.attr_name = attr_name
+        self.fetch_q ="MATCH (n:%s {unikey: $unikey}) RETURN n.%s as %s" % (owner.__name__, attr_name, attr_name)
+        self.store_q = ""
+
+    def __get__(self, obj, objtype=None):
+        return nj.query_read_return_list(obj.driver, self.fetch_q, unikey=obj.unikey)[0][self.attr_name]
+
+    def __set__(self, obj, value):
+        return
+
+class Experiment:
+    name = UnikeyedObjectProperty()
+    ts = UnikeyedObjectProperty()
+
+    def __init__(self, driver, unikey):
+        self.driver = driver
+        self.unikey = unikey
+
+class Procedure:
+    name = UnikeyedObjectProperty()
+    ts = UnikeyedObjectProperty()
+    code_strings = UnikeyedObjectProperty()
+
+    def __init__(self, driver, unikey):
+        self.driver = driver
+        self.unikey = unikey
+
+class Parameters:
+    name = UnikeyedObjectProperty()
+    ts = UnikeyedObjectProperty()
+    prepend_code_strings = UnikeyedObjectProperty()
+    append_code_strings = UnikeyedObjectProperty()
+    trial = UnikeyedObjectProperty()
+
+    def __init__(self, driver, unikey):
+        self.driver = driver
+        self.unikey = unikey
+
+class NNetProperty:
+    def __set_name__(self, owner, name):
+        self.owner = owner
+        self.name = name
+        self.cache_name = '_' + name
+        #self.fetch_q = "MATCH (n:Net {unikey: $unikey}) RETURN n.ksv as ksv, n.loss as loss"
+
+    def __get__(self, obj, objtype=None):
+        if not hasattr(obj, self.cache_name):
+            print(f"creating {self.name}")
+            #records = nj.query_read_return_list(obj.driver, self.fetch_q, unikey=obj.unikey)
+            #if len(records) < 1:
+            #    raise KeyError(f'No Net found with unikey={obj.unikey}')
+            #if len(records) > 1:
+            #    raise KeyError(f'Found {len(records)} Nets with unikey={obj.unikey}')
+            #r = records[0]
+            val = netMaker(obj.shorthand)
+            val.set_state_from_vector(obj.nps[obj.ksv])
+            setattr(obj, self.cache_name, val)
+        val = getattr(obj, self.cache_name)
+        return val
+
+    def __set__(self, obj, value):
+        return
+
+class Net:
+    batches_from_start = UnikeyedObjectProperty()
+    head = UnikeyedObjectProperty()
+    ksv = UnikeyedObjectProperty()
+    loss = UnikeyedObjectProperty()
+    shorthand = UnikeyedObjectProperty()
+    ts = UnikeyedObjectProperty()
+    nnet = NNetProperty()
+
+    def __init__(self, driver, nps, unikey):
+        self.driver = driver
+        self.nps = nps
+        self.unikey = unikey
