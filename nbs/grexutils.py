@@ -3,15 +3,23 @@
 
 # # Graph Experiment utilities
 
+from collections import defaultdict
+from more_itertools import collapse, flatten, groupby_transform
 import numpy as np
 from nnbench import netMaker
+from operator import itemgetter
 import time
-import tools.neotools as nj
 
 import neo4j
-from collections import defaultdict
+import tools.neotools as nj
+
 
 # https://neo4j.com/docs/cypher-manual/current/styleguide/
+
+class Thing:
+    """A generic object to hold attributes"""
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 # Methods to create nodes in the experiment graph
 
@@ -167,7 +175,7 @@ class UnikeyedObjectProperty:
         return nj.query_read_return_list(obj.driver, self.fetch_q, unikey=obj.unikey)[0][self.attr_name]
 
     def __set__(self, obj, value):
-        return
+        raise NotImplementedError
 
 class Experiment:
     name = UnikeyedObjectProperty()
@@ -186,17 +194,6 @@ class Procedure:
         self.driver = driver
         self.unikey = unikey
 
-class Parameters:
-    name = UnikeyedObjectProperty()
-    ts = UnikeyedObjectProperty()
-    prepend_code_strings = UnikeyedObjectProperty()
-    append_code_strings = UnikeyedObjectProperty()
-    trial = UnikeyedObjectProperty()
-
-    def __init__(self, driver, unikey):
-        self.driver = driver
-        self.unikey = unikey
-
 class NNetProperty:
     def __set_name__(self, owner, name):
         self.owner = owner
@@ -206,7 +203,7 @@ class NNetProperty:
 
     def __get__(self, obj, objtype=None):
         if not hasattr(obj, self.cache_name):
-            print(f"creating {self.name}")
+            #print(f"creating {self.name}")
             #records = nj.query_read_return_list(obj.driver, self.fetch_q, unikey=obj.unikey)
             #if len(records) < 1:
             #    raise KeyError(f'No Net found with unikey={obj.unikey}')
@@ -220,7 +217,7 @@ class NNetProperty:
         return val
 
     def __set__(self, obj, value):
-        return
+        raise NotImplementedError
 
 class Net:
     batches_from_start = UnikeyedObjectProperty()
@@ -235,3 +232,112 @@ class Net:
         self.driver = driver
         self.nps = nps
         self.unikey = unikey
+
+class DescendentNetsProperty:
+    def __set_name__(self, owner, name):
+        self.owner = owner
+        self.name = name
+        self.cache_name = '_' + name
+        self.fetch_q ="""
+MATCH (:Parameters {unikey: $unikey})-[:CONFIGURES]->(head:Net)
+MATCH p=(head)-[:LEARNED*]->(tail:Net)
+WHERE NOT (tail)-->()
+RETURN [n IN nodes(p) | n.unikey] as net_unikeys"""
+
+    def __get__(self, obj, objtype=None):
+        if not hasattr(obj, self.cache_name):
+            #print(f"creating {self.name}")
+            records = nj.query_read_return_list(obj.driver, self.fetch_q, unikey=obj.unikey)
+            if len(records) < 1:
+                #raise KeyError(f'No Nets found from Parameter with unikey={obj.unikey}')
+                return []
+            if len(records) > 1:
+                raise KeyError(f'Found {len(records)} from Parameter with unikey={obj.unikey}')
+            r = records[0]
+            val = [Net(obj.driver, obj.nps, key) for key in r['net_unikeys']]
+            setattr(obj, self.cache_name, val)
+        val = getattr(obj, self.cache_name)
+        return val
+
+    def __set__(self, obj, value):
+        raise NotImplementedError
+
+class TrajectoryProperty:
+    def __set_name__(self, owner, name):
+        self.owner = owner
+        self.name = name
+        self.cache_name = '_' + name
+        self.fetch_q ="""
+MATCH (:Parameters {unikey: $unikey})-[:CONFIGURES]->(head:Net)
+MATCH p=(head)-[:LEARNED*]->(tail:Net)
+WHERE NOT (tail)-->()
+RETURN relationships(p) AS relationships"""
+        self.fetch_q ="""
+MATCH (:Parameters {unikey: $unikey})-[:CONFIGURES]->(head:Net)
+MATCH (head)-[t:LEARNED*]->(tail:Net)
+WHERE NOT (tail)-->()
+RETURN [r IN t | r.batch_points] AS batch_points"""
+        self.fetch_q ="""
+MATCH (:Parameters {unikey: $unikey})-[:CONFIGURES]->(head:Net)
+MATCH (head)-[t:LEARNED*]->(tail:Net)
+WHERE NOT (tail)-->()
+UNWIND [r IN t | r.batch_points] AS u1
+UNWIND u1 as u2
+RETURN collect(u2) as batch_points"""
+        self.fetch_q ="""
+MATCH (:Parameters {unikey: $unikey})-[:CONFIGURES]->(head:Net)
+MATCH (head)-[t:LEARNED*]->(tail:Net)
+WHERE NOT (tail)-->()
+UNWIND [r IN t | [r.batch_points] AS w1, [r IN t | [r.traj_cos_sq_signeds] AS w2
+UNWIND w1 as u1, w2 as u2
+RETURN collect(u1) AS batch_points, collect(u2) AS traj_cos_sq_signeds"""
+        self.fetch_q ="""
+MATCH (:Parameters {unikey: $unikey})-[:CONFIGURES]->(head:Net)
+MATCH (head)-[t:LEARNED*]->(tail:Net)
+WHERE NOT (tail)-->()
+RETURN t"""
+
+    def __get__(self, obj, objtype=None):
+        if not hasattr(obj, self.cache_name):
+            #print(f"creating {self.name}")
+            records = nj.query_read_return_list(obj.driver, self.fetch_q, unikey=obj.unikey)
+            if len(records) < 1:
+                #raise KeyError(f'No Nets found from Parameter with unikey={obj.unikey}')
+                return []
+            if len(records) > 1:
+                raise KeyError(f'Found {len(records)} from Parameter with unikey={obj.unikey}')
+            r = records[0][0]
+            val = Thing(**dict(((k, list(v))
+                         for k,v in
+                         groupby_transform(
+                             sorted(
+                                 flatten(
+                                     list(a.items())
+                                     for a in r
+                                 )
+                             ),
+                             itemgetter(0),
+                             itemgetter(1),
+                             collapse,
+                         ))))
+            setattr(obj, self.cache_name, val)
+        val = getattr(obj, self.cache_name)
+        return val
+
+    def __set__(self, obj, value):
+        raise NotImplementedError
+
+class Parameters:
+    name = UnikeyedObjectProperty()
+    ts = UnikeyedObjectProperty()
+    prepend_code_strings = UnikeyedObjectProperty()
+    append_code_strings = UnikeyedObjectProperty()
+    trial = UnikeyedObjectProperty()
+    results = DescendentNetsProperty()
+    trajectory = TrajectoryProperty()
+
+    def __init__(self, driver, nps, unikey):
+        self.driver = driver
+        self.nps = nps
+        self.unikey = unikey
+
