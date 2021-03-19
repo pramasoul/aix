@@ -314,12 +314,14 @@ RETURN t"""
                                  flatten(
                                      list(a.items())
                                      for a in r
-                                 )
+                                 ),
+                                 key=itemgetter(0)
                              ),
                              itemgetter(0),
                              itemgetter(1),
                              collapse,
                          ))))
+            #val.r = r #DEBUG
             setattr(obj, self.cache_name, val)
         val = getattr(obj, self.cache_name)
         return val
