@@ -107,6 +107,17 @@ RETURN par.name as name, par.unikey as key
     return [(r['name'], r['key']) for r in
             nj.query_read_yield(driver, q, ex_key=ex_key, proc_key=proc_key)]
 
+def started_parameter_names_keys_from_experiment_and_procedure_keys(driver, ex_key, proc_key):
+    q = """
+MATCH (e:Experiment {unikey: $ex_key})
+-[:INCLUDES]->(proc:Procedure {unikey: $proc_key})
+-[:INCORPORATES]->(par:Parameters)
+-[:CONFIGURES]->(:Net)
+RETURN par.name as name, par.unikey as key
+"""
+    return [(r['name'], r['key']) for r in
+            nj.query_read_yield(driver, q, ex_key=ex_key, proc_key=proc_key)]
+
 def get_unstarted_parameters_of_procedure(driver, **kwargs):
     q="""
 MATCH (:Procedure {unikey: $procedure_unikey})
