@@ -16,7 +16,6 @@ services:
         target: /data
     ports:
       - "8848:8888" # JupyterLab
-      - "5555:5555" # flower
     user: root
     deploy:
       resources:
@@ -29,7 +28,7 @@ services:
   neo4j:
     image: neo4j:latest
     environment:
-      - NEO4J_AUTH=neo4j/test
+      - NEO4J_AUTH=neo4j/nonstandard # Only has effect if db does not already exist
     volumes:
       - type: bind
         source: /data-pool/soul/neo4j/data
@@ -50,3 +49,17 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=aix
+      - RABBITMQ_DEFAULT_PASS=nonstandard
+    ports:
+      - "5672:5672"
+      - "15672:15672" # management
+
+  flower:
+    image: mher/flower
+    environment:
+      - FLOWER_BROKER='amqp://aix:nonstandard@rabbitmq:5672//'
+      - FLOWER_BROKER_API='http://aix:nonstandard@rabbitmq:15672/api'
+    ports:
+      - "5555:5555" # flower
