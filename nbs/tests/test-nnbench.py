@@ -6,8 +6,8 @@ import numpy as np
 from numpy import array
 import sympy
 
-from nnbench import NNBench, NetMaker
-import nn
+from lib.nnbench import NNBench, NetMaker
+import lib.nn
 
 def arangep(n, starting_index=0):
     sympy.sieve.extend_to_no(starting_index + n)
@@ -22,11 +22,11 @@ class NNBenchTest(unittest.TestCase):
         return thing
 
     def setUp(self):
-        self.create_patch('nn.Network')
+        self.create_patch('lib.nn.Network')
 
 
     def test_bench_checkpoint(self):
-        net = nn.Network()
+        net = lib.nn.Network()
         bench = NNBench(net)
 
         # Checkpointing a net saves the internal state vector
@@ -41,8 +41,8 @@ class NNBenchTest(unittest.TestCase):
 
 
     def test_bench_network_input_width_detection(self):
-        # Mock up a network with a determined input width
-        net = nn.Network()
+        # Mock up network with a determined input width
+        net = lib.nn.Network()
         mock_layer = MagicMock()
         mock_layer.M = np.zeros(2*3).reshape(3,2)
         net.layers = [mock_layer]
@@ -53,15 +53,15 @@ class NNBenchTest(unittest.TestCase):
         self.assertEqual(NNBench.net_input_width(bench.net), 2)
 
 
-    def test_network_learn_input_form(self):
+    def test_nn_network_learn_input_form(self):
         # Make a constant training batch for a two-in, three-out net,
         # containing two examples
         training_batch = (np.arange(2*3).reshape(-1,2), arangep(3*3).reshape(-1,3))
 
-        # The training batch matches the form expected by Network.learn
+        # The training batch matches the form expected by nnnetwork.learn
         facts = [training_batch, training_batch] # Facts can have multiple batches
 
-        # Duplicating the looper from Network.learn
+        # Duplicating the looper from network.learn
         for x, expected in facts:
             self.assertEqual(x.shape[0], expected.shape[0]) # Each input has an output
             self.assertEqual(x.shape[1], 2) # Inputs have width 2
@@ -69,7 +69,7 @@ class NNBenchTest(unittest.TestCase):
 
     def test_bench_learn_training_batch(self):
         # Mock up a network of input width 2
-        net = nn.Network()
+        net = lib.nn.Network()
         mock_layer = MagicMock()
         mock_layer.M = np.zeros(2*3).reshape(3,2)
         net.layers = [mock_layer]
@@ -79,7 +79,7 @@ class NNBenchTest(unittest.TestCase):
         # containing two examples
         training_batch = (np.arange(2*3).reshape(-1,2), arangep(3*3).reshape(-1,3))
 
-        # The training batch matches the form expected by Network.learn
+        # The training batch matches the form expected by network.learn
         facts = [training_batch, training_batch] # Facts can have multiple batches
         for x, expected in facts:
             self.assertEqual(x.shape[0], expected.shape[0]) # Each input has an output
@@ -105,7 +105,7 @@ class NNBenchTest(unittest.TestCase):
 
 
     def test_training_data_literal_batch_cluster(self):
-        net = nn.Network()
+        net = lib.nn.Network()
 
         # Setup for input width of 2
         mock_layer = MagicMock()
@@ -138,7 +138,7 @@ class NNBenchTest(unittest.TestCase):
 
 
     def test_training_data_batching_from_literal(self):
-        net = nn.Network()
+        net = lib.nn.Network()
 
         # Setup for input width of 2
         mock_layer = MagicMock()
@@ -160,7 +160,7 @@ class NNBenchTest(unittest.TestCase):
 
 
     def test_training_data_batching_from_gen(self):
-        net = nn.Network()
+        net = lib.nn.Network()
 
         # Setup for input width of 2
         mock_layer = MagicMock()
@@ -182,7 +182,7 @@ class NNBenchTest(unittest.TestCase):
 
     @unittest.skip("Test is WIP")
     def test_bench_learn_training_data_gen_fixed(self):
-        net = nn.Network()
+        net = lib.nn.Network()
 
         # Setup for input width of 2
         mock_layer = MagicMock()
@@ -219,7 +219,7 @@ class NNBenchTest(unittest.TestCase):
 
     @unittest.skip("Test is defective")
     def test_bench_learn_gen_randn(self):
-        net = nn.Network()
+        net = lib.nn.Network()
         mock_layer = MagicMock()
         mock_layer.M = np.zeros(2*3).reshape(3,2)
         net.layers = [mock_layer]
@@ -251,14 +251,14 @@ class NetMakerTest(unittest.TestCase):
         return thing
 
     def setUp(self):
-        self.mockNetwork = self.create_patch('nn.Network')
-        self.mockAffineLayer = self.create_patch('nn.AffineLayer')
-        self.mockMapLayer = self.create_patch('nn.MapLayer')
+        self.mockNetwork = self.create_patch('lib.nn.Network')
+        self.mockAffineLayer = self.create_patch('lib.nn.AffineLayer')
+        self.mockMapLayer = self.create_patch('lib.nn.MapLayer')
 
     def test_is_patched(self):
-        assert nn.Network is self.mockNetwork
-        assert nn.AffineLayer is self.mockAffineLayer
-        assert nn.MapLayer is self.mockMapLayer
+        assert lib.nn.Network is self.mockNetwork
+        assert lib.nn.AffineLayer is self.mockAffineLayer
+        assert lib.nn.MapLayer is self.mockMapLayer
 
     def test_NM_does_not_make_Network_on_creation(self):
         # Creating a NetMaker does not create a Network
@@ -296,7 +296,7 @@ class NetMakerTest(unittest.TestCase):
 
     @unittest.skip("Test is defective")
     def test_NM_returns_a_Network_instance(self):
-        with patch('nn.Network') as mock:
+        with patch('lib.nn.Network') as mock:
             nm = NetMaker()
             a_net = nm('1x3')
             print(a_net)
@@ -326,13 +326,13 @@ class DemoTest(unittest.TestCase):
         return thing
 
     def test_foo(self):
-        mock_Network = self.create_patch('nn.Network')
-        mock_AffineLayer = self.create_patch('nn.AffineLayer')
-        mock_MapLayer = self.create_patch('nn.MapLayer')
+        mock_Network = self.create_patch('lib.nn.Network')
+        mock_AffineLayer = self.create_patch('lib.nn.AffineLayer')
+        mock_MapLayer = self.create_patch('lib.nn.MapLayer')
 
-        assert nn.Network is mock_Network
-        assert nn.AffineLayer is mock_AffineLayer
-        assert nn.MapLayer is mock_MapLayer
+        assert lib.nn.Network is mock_Network
+        assert lib.nn.AffineLayer is mock_AffineLayer
+        assert lib.nn.MapLayer is mock_MapLayer
 
 
 if __name__ == '__main__':

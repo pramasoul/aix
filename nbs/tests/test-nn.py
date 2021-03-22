@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import sympy
 
-import nn
+import lib.nn as nn
 
 def arangep(n, starting_index=0):
     sympy.sieve.extend_to_no(starting_index + n)
