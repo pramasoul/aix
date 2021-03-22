@@ -1,5 +1,7 @@
 version: "3.9"
 
+## say e.g. `docker-compose --env-file .env.dev up -d`
+
 services:
 
   gpu-jupyter:
@@ -9,10 +11,10 @@ services:
       - JUPYTER_ENABLE_LAB=yes
     volumes:
       - type: bind
-        source: /home/soul/Projects/aix
+        source: ${HOME}/Projects/aix
         target: /home/jovyan/work
       - type: bind
-        source: /data-pool/nn
+        source: ${DATAPOOL}/nn
         target: /data
     ports:
       - "8848:8888" # JupyterLab
@@ -31,16 +33,16 @@ services:
       - NEO4J_AUTH=neo4j/nonstandard # Only has effect if db does not already exist
     volumes:
       - type: bind
-        source: /data-pool/soul/neo4j/data
+        source: ${DATAPOOL}/soul/neo4j/data
         target: /data
       - type: bind
-        source: /data-pool/soul/neo4j/logs
+        source: ${DATAPOOL}/soul/neo4j/logs
         target: /logs
       - type: bind
-        source: /data-pool/soul/neo4j/import
+        source: ${DATAPOOL}/soul/neo4j/import
         target: /var/lib/neo4j/import
       - type: bind
-        source: /data-pool/soul/neo4j/plugins
+        source: ${DATAPOOL}/soul/neo4j/plugins
         target: /plugins
     ports:
       - "7373:7373"
@@ -50,8 +52,8 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     environment:
-      - RABBITMQ_DEFAULT_USER=aix
-      - RABBITMQ_DEFAULT_PASS=nonstandard
+      - RABBITMQ_DEFAULT_USER
+      - RABBITMQ_DEFAULT_PASS
     ports:
       - "5672:5672"
       - "15672:15672" # management
@@ -59,7 +61,7 @@ services:
   flower:
     image: mher/flower
     environment:
-      - FLOWER_BROKER='amqp://aix:nonstandard@rabbitmq:5672//'
-      - FLOWER_BROKER_API='http://aix:nonstandard@rabbitmq:15672/api'
+      - FLOWER_BROKER
+      - FLOWER_BROKER_API
     ports:
       - "5555:5555" # flower
