@@ -148,6 +148,7 @@ class NNBench:
         return [self.training_batch(n)]
 
     @deprecated(
+        version='0.4.1',
         reason="Too limited. Use `accept_source_of_truth` or another method.",
         category=FutureWarning,
     )
@@ -161,6 +162,7 @@ class NNBench:
             # FIX by using a method to obtain examples from domain
 
     @deprecated(
+        version='0.4.1',
         reason="Too limited. Use `accept_source_of_truth` or another method.",
         category=FutureWarning,
     )
